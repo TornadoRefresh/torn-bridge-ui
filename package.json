@@ -18,8 +18,13 @@
     "@omni-bridge/evm": "^0.19.0",
     "@omni-bridge/solana": "^0.19.0",
     "@solana/spl-token": "^0.4.15",
+    "@solana/wallet-standard-features": "^1.5.0",
     "@solana/web3.js": "^1.99.0",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
+    "bs58": "^6.0.0",
     "buffer": "^6.0.3",
+    "mipd": "^0.0.7",
     "viem": "^2.56.3"
   }
 }

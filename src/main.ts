@@ -2,7 +2,7 @@ import './style.css'
 import { formatUnits, parseUnits, isAddress, type Address } from 'viem'
 import { PublicKey } from '@solana/web3.js'
 import { NETWORK, TORN_ETH, ETH_DECIMALS, SOL_DECIMALS, EXPLORER, KNOWN } from './config'
-import { connectEvm, connectSol, detectedWallets, onEvmEvents } from './wallets'
+import { connectEvm, connectSol, evmWalletName, onEvmEvents, solWalletName } from './wallets'
 import { ethBalance, solBalance, quote, sendEthToSol, sendSolToEth, status, tornMint, evm, type Quote } from './bridge'
 
 type Dir = 'eth2sol' | 'sol2eth'
@@ -142,6 +142,8 @@ async function refresh() {
     balance = !connected ? 0n : dir === 'eth2sol' ? await ethBalance(evmAccount!) : await solBalance(solAccount!)
   } catch { balance = 0n }
   $('#balance').textContent = connected ? `Balance: ${fmt(balance)} TORN` : '—'
+  const names = [evmAccount && `Ethereum: ${evmWalletName} ${evmAccount.slice(0, 6)}…${evmAccount.slice(-4)}`, solAccount && `Solana: ${solWalletName} ${solAccount.toBase58().slice(0, 4)}…${solAccount.toBase58().slice(-4)}`].filter(Boolean)
+  $('#wallet-hint').textContent = names.join('  ·  ')
   updateAction()
   scheduleQuote()
 }
@@ -236,7 +238,7 @@ async function pollHistory() {
 async function onAction() {
   showError(null)
   try {
-    if (dir === 'eth2sol' && !evmAccount) { evmAccount = await connectEvm(); await refresh(); return }
+    if (dir === 'eth2sol' && !evmAccount) { evmAccount = await connectEvm(); onEvmEvents((a) => { evmAccount = (a[0] as Address) ?? null; refresh() }, () => location.reload()); await refresh(); return }
     if (dir === 'sol2eth' && !solAccount) { solAccount = await connectSol(); await refresh(); return }
     const amt = parseAmount()!
     const to = recipientEl.value.trim()
@@ -287,11 +289,9 @@ $('#use-mine').addEventListener('click', async (e) => {
     scheduleQuote()
   } catch (err: any) { showError(err?.message ?? String(err)) }
 })
-onEvmEvents((a) => { evmAccount = (a[0] as Address) ?? null; refresh() }, () => location.reload())
 
 ;(async () => {
   renderHistory()
-  $('#wallet-hint').textContent = `Wallet: ${detectedWallets()}`
   const mint = await tornMint()
   $('#mint').innerHTML = mint ? `<a href="${EXPLORER.solToken(mint)}" target="_blank" rel="noopener">${mint.slice(0, 6)}…${mint.slice(-4)}</a>` : 'not deployed yet'
   $('#not-deployed').classList.toggle('hidden', !!mint)
