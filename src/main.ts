@@ -25,11 +25,7 @@ app.innerHTML = `
   <header class="header"><div class="container">
     <a class="brand" href="https://tornadocash.eth.limo" target="_blank" rel="noopener"><img src="/logo.svg" alt="" /><span>tornado</span></a>
     <nav class="nav"><a href="https://tornadocash.eth.limo" target="_blank" rel="noopener">App</a><a href="https://etherscan.io/token/${TORN_ETH}" target="_blank" rel="noopener">TORN</a><a href="https://github.com/Near-One/omni-bridge" target="_blank" rel="noopener">Omni Bridge</a></nav>
-    <div class="wallet-bar">
-      <span class="network-tag ${NETWORK}"><span class="dot"></span>${NETWORK === 'mainnet' ? 'mainnet' : 'testnet'}</span>
-      <div class="wallet-chip" id="chip-eth"></div>
-      <div class="wallet-chip" id="chip-sol"></div>
-    </div>
+    <span class="network-tag ${NETWORK}"><span class="dot"></span>${NETWORK === 'mainnet' ? 'Ethereum ↔ Solana' : 'Sepolia ↔ Devnet'}</span>
   </div></header>
 
   <main class="main"><div class="container"><div class="grid">
@@ -45,6 +41,8 @@ app.innerHTML = `
           <div class="chain"><span class="chain-icon" id="to-icon">◎</span><span id="to-name">Solana</span></div>
         </div>
 
+        <div class="wallet-row hidden" id="wallet-row"></div>
+
         <div id="not-deployed" class="notice is-warning hidden">TORN is not registered on Omni Bridge for this network yet. Run the registration scripts first.</div>
 
         <div class="field">
@@ -53,7 +51,7 @@ app.innerHTML = `
         </div>
 
         <div class="field">
-          <div class="label"><span id="recipient-label">Recipient (Solana address)</span><button class="link" id="use-mine">use connected wallet</button></div>
+          <div class="label"><span id="recipient-label">Recipient (Solana address)</span><button class="link hidden" id="use-mine">use connected wallet</button></div>
           <div class="control"><input class="input" id="recipient" placeholder="" autocomplete="off" spellcheck="false" /></div>
         </div>
 
@@ -154,7 +152,7 @@ function updateAction() {
   const connected = dir === 'eth2sol' ? !!evmAccount : !!solAccount
   const amt = parseAmount()
   if (busy) { actionBtn.disabled = true; return }
-  if (!connected) { actionBtn.textContent = dir === 'eth2sol' ? 'Connect Ethereum wallet (top right)' : 'Connect Solana wallet (top right)'; actionBtn.disabled = true; return }
+  if (!connected) { actionBtn.textContent = dir === 'eth2sol' ? 'Connect Ethereum wallet' : 'Connect Solana wallet'; actionBtn.disabled = false; return }
   if (!amt) { actionBtn.textContent = 'Enter amount'; actionBtn.disabled = true; return }
   if (amt > balance) { actionBtn.textContent = 'Insufficient balance'; actionBtn.disabled = true; return }
   if (!recipientValid()) { actionBtn.textContent = 'Enter recipient'; actionBtn.disabled = true; return }
@@ -211,19 +209,19 @@ function setSteps(list: string[], activeIdx: number) {
   stepsEl.innerHTML = list.map((s, i) => `<li class="${i < activeIdx ? 'done' : i === activeIdx ? 'active' : ''}">${s}</li>`).join('')
 }
 
-function chip(el: HTMLElement, label: string, icon: string, name: string, addr: string | null, onConnect: () => void, onDisconnect: () => void) {
-  if (!addr) {
-    el.innerHTML = `<button class="button is-small chip-connect">Connect ${label}</button>`
-    el.querySelector('button')!.addEventListener('click', onConnect)
-    return
-  }
-  el.innerHTML = `<span class="chip-connected" title="${name} · ${addr}">${icon ? `<img src="${icon}" alt="" />` : `<span class="chain-icon">${label === 'ETH' ? 'Ξ' : '◎'}</span>`}<span class="chip-addr">${addr.slice(0, 6)}…${addr.slice(-4)}</span><button class="chip-x" title="Disconnect ${label}">×</button></span>`
-  el.querySelector('.chip-x')!.addEventListener('click', onDisconnect)
-}
-
+/** Shows the wallet of the current source chain with a disconnect link. */
 function renderWalletBar() {
-  chip($('#chip-eth'), 'ETH', evmWalletIcon, evmWalletName, evmAccount, doConnectEvm, doDisconnectEvm)
-  chip($('#chip-sol'), 'SOL', solWalletIcon, solWalletName, solAccount?.toBase58() ?? null, doConnectSol, doDisconnectSol)
+  const el = $('#wallet-row')
+  const eth2sol = dir === 'eth2sol'
+  const addr = eth2sol ? evmAccount : solAccount?.toBase58() ?? null
+  const name = eth2sol ? evmWalletName : solWalletName
+  const icon = eth2sol ? evmWalletIcon : solWalletIcon
+  el.classList.toggle('hidden', !addr)
+  if (!addr) { el.innerHTML = ''; return }
+  el.innerHTML = `${icon ? `<img src="${icon}" alt="" />` : `<span class="chain-icon">${eth2sol ? 'Ξ' : '◎'}</span>`}<span class="wallet-name">${name}</span><span class="wallet-addr" title="${addr}">${addr.slice(0, 6)}…${addr.slice(-4)}</span><button class="link wallet-disconnect">disconnect</button>`
+  el.querySelector('.wallet-disconnect')!.addEventListener('click', eth2sol ? doDisconnectEvm : doDisconnectSol)
+  // "use connected wallet" only makes sense when the other chain's wallet is connected
+  $('#use-mine').classList.toggle('hidden', eth2sol ? !solAccount : !evmAccount)
 }
 
 async function doConnectEvm() {
@@ -270,6 +268,8 @@ async function pollHistory() {
 
 async function onAction() {
   showError(null)
+  if (dir === 'eth2sol' && !evmAccount) return doConnectEvm()
+  if (dir === 'sol2eth' && !solAccount) return doConnectSol()
   try {
     const amt = parseAmount()!
     const to = recipientEl.value.trim()

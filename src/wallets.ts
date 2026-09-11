@@ -10,7 +10,7 @@ import bs58 from 'bs58'
 import { ETH_CHAIN_ID, ETH_RPC, NETWORK, SOL_RPCS } from './config'
 
 declare global {
-  interface Window { ethereum?: any }
+  interface Window { ethereum?: any; solana?: any; phantom?: { solana?: any }; okxwallet?: any }
 }
 
 // ---------- chain clients ----------
@@ -116,28 +116,65 @@ export function onEvmEvents(onAccounts: (a: string[]) => void, onChain: () => vo
 }
 
 // ---------- Solana ----------
+/** Phantom-style injected provider (window.solana etc.), used only when Wallet Standard connect yields no Solana account. */
+type LegacySol = { connect(): Promise<any>; publicKey?: any; signAndSendTransaction(tx: Transaction): Promise<any> }
+function legacySolProviders(): { name: string; provider: LegacySol }[] {
+  const out: { name: string; provider: LegacySol }[] = []
+  if (window.okxwallet?.solana) out.push({ name: 'OKX Wallet', provider: window.okxwallet.solana })
+  if (window.phantom?.solana) out.push({ name: 'Phantom', provider: window.phantom.solana })
+  if (window.solana && !out.some((o) => o.provider === window.solana)) out.push({ name: 'Solana (injected)', provider: window.solana })
+  return out
+}
+let solLegacy: LegacySol | null = null
+
 let solSelected: { wallet: SolWallet; account: WalletAccount } | null = null
 export let solWalletName = ''
 export let solWalletIcon = ''
 
 export async function connectSol(): Promise<PublicKey> {
   const options = solOptions()
-  if (!options.length) throw new Error('No Solana wallet found. Install a Wallet Standard wallet (OKX, Phantom, Solflare, …).')
-  const sel = await pickWallet('Solana wallet', options)
-  const { accounts } = await sel.wallet.features[StandardConnect].connect()
-  const account = accounts.find((a) => a.chains.includes(SOL_CHAIN)) ?? accounts[0]
-  if (!account) throw new Error('No Solana account authorized')
-  solSelected = { wallet: sel.wallet, account }; solWalletName = sel.name; solWalletIcon = sel.icon
-  return new PublicKey(account.address)
+  console.info('[wallet] wallet-standard registry', solRegistry.get().map((w) => ({ name: w.name, chains: w.chains, features: Object.keys(w.features) })))
+  solLegacy = null
+  if (options.length) {
+    const sel = await pickWallet('Solana wallet', options)
+    let accounts: readonly WalletAccount[] = []
+    try { accounts = (await sel.wallet.features[StandardConnect].connect()).accounts } catch (e) { console.warn('[wallet] wallet-standard connect failed', e) }
+    console.info('[wallet] solana connect result', accounts.map((a) => ({ address: a.address, chains: a.chains })))
+    const solAccounts = accounts.filter((a) => a.chains.some((c) => c.startsWith('solana:')))
+    const account = solAccounts.find((a) => a.chains.includes(SOL_CHAIN)) ?? solAccounts[0]
+    if (account) {
+      try {
+        const pk = new PublicKey(account.address)
+        solSelected = { wallet: sel.wallet, account }; solWalletName = sel.name; solWalletIcon = sel.icon
+        return pk
+      } catch { console.warn('[wallet] unexpected address from wallet standard', account.address) }
+    }
+  }
+  // Fallback: Phantom-style injected API (some wallets only expose Solana here for imported keys)
+  const legacy = legacySolProviders()
+  if (!legacy.length) throw new Error(options.length ? 'The wallet returned no Solana account. Select a Solana address for this site in the wallet and try again.' : 'No Solana wallet found. Install OKX Wallet, Phantom or Solflare.')
+  const pick = legacy.length === 1 ? legacy[0] : await pickWallet('Solana wallet', legacy.map((l) => ({ id: l.name, name: l.name, icon: '', provider: l.provider })))
+  const res = await pick.provider.connect()
+  const pkStr = (res?.publicKey ?? pick.provider.publicKey)?.toString()
+  if (!pkStr) throw new Error(`${pick.name} did not return a Solana account`)
+  console.info('[wallet] solana connected via injected API', pick.name, pkStr)
+  solLegacy = pick.provider; solSelected = null; solWalletName = pick.name; solWalletIcon = ''
+  return new PublicKey(pkStr)
 }
 
 export async function disconnectSol() {
   const w = solSelected?.wallet as (Wallet & { features: Partial<StandardDisconnectFeature> }) | undefined
-  solSelected = null; solWalletName = ''; solWalletIcon = ''
+  const l = solLegacy as any
+  solSelected = null; solLegacy = null; solWalletName = ''; solWalletIcon = ''
+  try { await l?.disconnect?.() } catch { /* optional */ }
   try { await w?.features[StandardDisconnect]?.disconnect() } catch { /* optional feature */ }
 }
 
 export async function signAndSendSol(tx: Transaction): Promise<string> {
+  if (solLegacy) {
+    const res = await solLegacy.signAndSendTransaction(tx)
+    return typeof res === 'string' ? res : res.signature
+  }
   if (!solSelected) throw new Error('Solana wallet not connected')
   const bytes = tx.serialize({ requireAllSignatures: false, verifySignatures: false })
   const [out] = await solSelected.wallet.features[SolanaSignAndSendTransaction].signAndSendTransaction({

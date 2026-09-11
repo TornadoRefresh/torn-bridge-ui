@@ -138,14 +138,10 @@ code { color: var(--primary); }
 .wallet-item { justify-content: flex-start; width: 100%; height: 3.2em; }
 .wallet-item img { width: 24px; height: 24px; border-radius: 6px; }
 
-.wallet-bar { display: flex; align-items: center; gap: .6rem; margin-left: auto; flex-wrap: wrap; }
-.nav { margin-right: 0; }
-.wallet-chip { display: inline-flex; }
-.chip-connect { height: 2.4em; }
-.chip-connected { display: inline-flex; align-items: center; gap: .5rem; height: 2.4em; padding: 0 .4rem 0 .6rem; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); font-size: .85rem; }
-.chip-connected img { width: 18px; height: 18px; border-radius: 4px; }
-.chip-connected .chain-icon { width: 18px; height: 18px; font-size: 9px; }
-.chip-addr { color: var(--primary); }
-.chip-x { background: none; border: 0; color: var(--gray); font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 0 .3rem; }
-.chip-x:hover { color: var(--danger); }
-@media (max-width: 520px) { .wallet-bar { margin-left: 0; width: 100%; } }
+
+.wallet-row { display: flex; align-items: center; gap: .5rem; margin: -0.25rem 0 1rem; font-size: .85rem; color: var(--gray); }
+.wallet-row img { width: 18px; height: 18px; border-radius: 4px; }
+.wallet-row .chain-icon { width: 18px; height: 18px; font-size: 9px; }
+.wallet-row .wallet-name { color: var(--fg); }
+.wallet-row .wallet-addr { color: var(--primary); }
+.wallet-row .wallet-disconnect { margin-left: auto; }
