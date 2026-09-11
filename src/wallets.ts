@@ -20,6 +20,15 @@ export const connections = SOL_RPCS.map((u) => new Connection(u, 'confirmed'))
 export const connection = connections[0]
 const SOL_CHAIN = NETWORK === 'mainnet' ? 'solana:mainnet' : 'solana:devnet'
 
+/** Run a read against each RPC in turn until one answers. */
+export async function withConnection<T>(fn: (c: Connection) => Promise<T>): Promise<T> {
+  let lastErr: unknown
+  for (const c of connections) {
+    try { return await fn(c) } catch (e) { lastErr = e }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('All Solana RPCs failed')
+}
+
 /** Fresh blockhash from the first RPC that answers. */
 export async function latestBlockhash(): Promise<string> {
   let lastErr: unknown

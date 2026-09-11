@@ -5,7 +5,7 @@ import { erc20Abi, type Address } from 'viem'
 import { PublicKey, Transaction } from '@solana/web3.js'
 import { getAssociatedTokenAddress } from '@solana/spl-token'
 import { NETWORK, TORN_ETH, ETH_RPC, SOL_RPC, KNOWN } from './config'
-import { connection, latestBlockhash, publicClient, signAndSendSol, walletClient } from './wallets'
+import { connection, latestBlockhash, publicClient, signAndSendSol, walletClient, withConnection } from './wallets'
 
 export const bridge = createBridge({ network: NETWORK, rpcUrls: { [ChainKind.Eth]: ETH_RPC, [ChainKind.Sol]: SOL_RPC } as any })
 export const api = new BridgeAPI(NETWORK)
@@ -40,9 +40,13 @@ export async function solBalance(owner: PublicKey): Promise<bigint> {
   if (!mint) return 0n
   const ata = await getAssociatedTokenAddress(new PublicKey(mint), owner)
   try {
-    const b = await connection.getTokenAccountBalance(ata)
-    return BigInt(b.value.amount)
-  } catch {
+    // getAccountInfo is a plain account read, accepted by free public RPCs (getTokenAccountBalance is not)
+    const info = await withConnection((c) => c.getParsedAccountInfo(ata))
+    const data = info.value?.data as any
+    const amount = data?.parsed?.info?.tokenAmount?.amount
+    return amount ? BigInt(amount) : 0n
+  } catch (e) {
+    console.warn('[solana] balance read failed', e)
     return 0n
   }
 }

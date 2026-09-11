@@ -20,9 +20,13 @@ export const KNOWN = NETWORK === 'mainnet'
 
 export const ETH_CHAIN_ID = NETWORK === 'mainnet' ? 1 : 11155111
 export const ETH_RPC = NETWORK === 'mainnet' ? 'https://ethereum-rpc.publicnode.com' : 'https://ethereum-sepolia-rpc.publicnode.com'
-/** Public Solana RPCs, tried in order (public nodes occasionally return stale blockhashes). */
+/**
+ * Public Solana RPCs, tried in order. api.mainnet-beta.solana.com rejects requests that carry a browser
+ * Origin header (HTTP 403), so publicnode goes first; only non-indexed methods (getAccountInfo,
+ * getLatestBlockhash) are used so free endpoints accept them.
+ */
 export const SOL_RPCS = NETWORK === 'mainnet'
-  ? ['https://api.mainnet-beta.solana.com', 'https://solana-rpc.publicnode.com']
+  ? ['https://solana-rpc.publicnode.com', 'https://api.mainnet-beta.solana.com']
   : ['https://api.devnet.solana.com']
 export const SOL_RPC = SOL_RPCS[0]
 
