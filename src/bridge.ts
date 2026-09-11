@@ -4,8 +4,8 @@ import { createSolanaBuilder } from '@omni-bridge/solana'
 import { erc20Abi, type Address } from 'viem'
 import { PublicKey, Transaction } from '@solana/web3.js'
 import { getAssociatedTokenAddress } from '@solana/spl-token'
-import { NETWORK, TORN_ETH, ETH_RPC, SOL_RPC } from './config'
-import { connection, publicClient, signAndSendSol, walletClient } from './wallets'
+import { NETWORK, TORN_ETH, ETH_RPC, SOL_RPC, KNOWN } from './config'
+import { connection, latestBlockhash, publicClient, signAndSendSol, walletClient } from './wallets'
 
 export const bridge = createBridge({ network: NETWORK, rpcUrls: { [ChainKind.Eth]: ETH_RPC, [ChainKind.Sol]: SOL_RPC } as any })
 export const api = new BridgeAPI(NETWORK)
@@ -16,14 +16,17 @@ export const tokenEth: OmniAddress = `eth:${TORN_ETH}`
 
 let cachedMint: string | null | undefined
 
-/** The wrapped TORN mint on Solana, as registered on the bridge. null = not deployed yet. */
+/**
+ * The wrapped TORN mint on Solana as registered on the bridge contract.
+ * Falls back to the known deployment if the RPC lookup fails. null = not deployed.
+ */
 export async function tornMint(): Promise<string | null> {
   if (cachedMint !== undefined) return cachedMint
   try {
     const bridged = await bridge.getBridgedToken(tokenEth, ChainKind.Sol)
-    cachedMint = bridged ? bridged.replace(/^sol:/, '') : null
+    cachedMint = bridged ? bridged.replace(/^sol:/, '') : KNOWN.solMint
   } catch {
-    cachedMint = null
+    cachedMint = KNOWN.solMint
   }
   return cachedMint
 }
@@ -92,8 +95,7 @@ export async function sendSolToEth(from: PublicKey, to: Address, amount: bigint,
   const validated = await bridge.validateTransfer({ token, amount, fee: q.tokenFee, nativeFee: q.nativeFee, sender: `sol:${from.toBase58()}`, recipient: `eth:${to}` })
   onStep('Building transaction')
   const ixs = await sol.buildTransfer(validated, from)
-  const { blockhash } = await connection.getLatestBlockhash()
-  const tx = new Transaction({ recentBlockhash: blockhash, feePayer: from })
+  const tx = new Transaction({ recentBlockhash: await latestBlockhash(), feePayer: from })
   tx.add(...ixs)
   onStep('Confirm the transaction in your wallet')
   const sig = await signAndSendSol(tx)

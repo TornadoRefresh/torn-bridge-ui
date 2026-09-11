@@ -1,7 +1,7 @@
 import './style.css'
 import { formatUnits, parseUnits, isAddress, type Address } from 'viem'
 import { PublicKey } from '@solana/web3.js'
-import { NETWORK, TORN_ETH, ETH_DECIMALS, SOL_DECIMALS, EXPLORER } from './config'
+import { NETWORK, TORN_ETH, ETH_DECIMALS, SOL_DECIMALS, EXPLORER, KNOWN } from './config'
 import { connectEvm, connectSol } from './wallets'
 import { ethBalance, solBalance, quote, sendEthToSol, sendSolToEth, status, tornMint, evm, type Quote } from './bridge'
 
@@ -72,6 +72,7 @@ app.innerHTML = `
         <div class="stats">
           <div class="k">Token</div><div class="v"><a href="${EXPLORER.eth}/token/${TORN_ETH}" target="_blank" rel="noopener">TORN</a> · ${TORN_ETH.slice(0, 6)}…${TORN_ETH.slice(-4)}</div>
           <div class="k">Solana mint</div><div class="v" id="mint">loading…</div>
+          ${KNOWN.nearToken ? `<div class="k">NEAR token</div><div class="v plain"><a href="${EXPLORER.nearAccount(KNOWN.nearToken)}" target="_blank" rel="noopener">${KNOWN.nearToken.slice(0, 10)}…factory.bridge.near</a></div>` : ''}
           <div class="k">Bridge contract</div><div class="v plain"><a href="${EXPLORER.eth}/address/${evm.bridgeAddress}" target="_blank" rel="noopener">${evm.bridgeAddress.slice(0, 6)}…${evm.bridgeAddress.slice(-4)}</a></div>
           <div class="k">Decimals</div><div class="v plain">18 on Ethereum · 9 on Solana</div>
           <div class="k">Security</div><div class="v plain">Lock &amp; mint via NEAR Omni Bridge (light client + MPC)</div>

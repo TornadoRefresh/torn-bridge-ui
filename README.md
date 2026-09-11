@@ -27,9 +27,24 @@ http://localhost:5173/?network=testnet&token=0x<MockTORN address>
 npm run build        # static files in dist/ — host anywhere (IPFS, Netlify, ENS)
 ```
 
+## Deployment (mainnet)
+
+| | |
+|---|---|
+| TORN on Ethereum | `0x77777FeDdddFfC19Ff86DB637967013e6C6A116C` |
+| TORN on Solana (Omni Bridge wrapped mint, 9 decimals) | `3mah3LRFDSJir7zggYPARamFi81qmfoYCDuU61hYtMZN` |
+| NEAR mapped token | `77777feddddffc19ff86db637967013e6c6a116c.factory.bridge.near` |
+| Bridge contracts | Ethereum `0xe00c629aFaCCb0510995A2B95560E446A24c85B9` · NEAR `omni.bridge.near` · Solana `dahPEoZGXfyV58JqqH85okdHmpN8U2q8owgPUXSCPxe` |
+
+Registered on Omni Bridge on 2026-09-11 and verified with a 1 TORN round trip in both directions
+(Ethereum → Solana ≈ 20 min, Solana → Ethereum < 2 min, relayer fees ≈ $0.26 / $0.02).
+The mint address is derived deterministically by the bridge program; the page reads it from the bridge
+contract on load and falls back to the value above.
+
 ## Notes
 
-- Until TORN is registered on Omni Bridge (see `../torn-solana-bridge/`), the page shows a warning and fee quotes fail with "not registered". That is expected.
+- Ethereum → Solana waits for the NEAR Ethereum light client (~16–20 min); Solana → Ethereum only needs Wormhole attestation.
+- Amounts are truncated from 18 to 9 decimals on the way to Solana.
 - The Wormhole SDK pulled in by `@omni-bridge/core` is stubbed out (`src/stubs/wormhole.ts`); the UI never needs to fetch VAAs.
 - Bridge addresses are read from the SDK, not hardcoded. The TORN address lives in `src/config.ts`.
 

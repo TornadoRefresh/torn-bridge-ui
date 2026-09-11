@@ -1,7 +1,7 @@
 import { createPublicClient, createWalletClient, custom, http, type Address } from 'viem'
 import { mainnet, sepolia } from 'viem/chains'
 import { Connection, PublicKey, Transaction } from '@solana/web3.js'
-import { ETH_CHAIN_ID, ETH_RPC, SOL_RPC } from './config'
+import { ETH_CHAIN_ID, ETH_RPC, SOL_RPCS } from './config'
 
 declare global {
   interface Window {
@@ -13,7 +13,17 @@ declare global {
 
 export const evmChain = ETH_CHAIN_ID === 1 ? mainnet : sepolia
 export const publicClient = createPublicClient({ chain: evmChain, transport: http(ETH_RPC) })
-export const connection = new Connection(SOL_RPC, 'confirmed')
+export const connections = SOL_RPCS.map((u) => new Connection(u, 'confirmed'))
+export const connection = connections[0]
+
+/** Fresh blockhash from the first RPC that answers. */
+export async function latestBlockhash(): Promise<string> {
+  let lastErr: unknown
+  for (const c of connections) {
+    try { return (await c.getLatestBlockhash('confirmed')).blockhash } catch (e) { lastErr = e }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('All Solana RPCs failed')
+}
 
 export async function connectEvm(): Promise<Address> {
   if (!window.ethereum) throw new Error('No Ethereum wallet found. Install MetaMask or Rabby.')
