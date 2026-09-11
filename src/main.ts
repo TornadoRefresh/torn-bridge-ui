@@ -130,7 +130,7 @@ function setDir(d: Dir) {
   $('#to-icon').textContent = eth2sol ? '◎' : 'Ξ'
   $('#recipient-label').textContent = eth2sol ? 'Recipient (Solana address)' : 'Recipient (Ethereum address)'
   recipientEl.placeholder = eth2sol ? 'Solana address' : '0x…'
-  $('#eta').textContent = eth2sol ? '~20 min' : '~5 min'
+  $('#eta').textContent = eth2sol ? '~20 min' : '2–5 min'
   recipientEl.value = ''
   currentQuote = null
   showError(null)
@@ -276,8 +276,8 @@ async function onAction() {
     const q = currentQuote!
     busy = true; updateAction()
     const steps = dir === 'eth2sol'
-      ? ['Validate', 'Approve TORN', 'Sign bridge transaction', 'Ethereum confirmed → NEAR light client (~16 min)', 'Minted on Solana']
-      : ['Validate', 'Sign transaction', 'Solana confirmed → Wormhole → NEAR', 'Released on Ethereum']
+      ? ['Validate', 'Approve TORN', 'Sign bridge transaction', 'Ethereum confirmed → NEAR light client verifies (~16 min) → MPC signs', 'Relayer mints on Solana']
+      : ['Validate', 'Sign transaction', 'Solana confirmed → Wormhole attests → NEAR verifies → MPC signs', 'Relayer releases on Ethereum']
     setSteps(steps, 0)
     const onStep = (s: string) => {
       const idx = /approv/i.test(s) ? 1 : /confirm|sign/i.test(s) ? (dir === 'eth2sol' ? 2 : 1) : /submitted/i.test(s) ? (dir === 'eth2sol' ? 3 : 2) : 0
