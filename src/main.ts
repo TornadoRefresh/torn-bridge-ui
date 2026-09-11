@@ -2,7 +2,7 @@ import './style.css'
 import { formatUnits, parseUnits, isAddress, type Address } from 'viem'
 import { PublicKey } from '@solana/web3.js'
 import { NETWORK, TORN_ETH, ETH_DECIMALS, SOL_DECIMALS, EXPLORER, KNOWN } from './config'
-import { connectEvm, connectSol } from './wallets'
+import { connectEvm, connectSol, detectedWallets, onEvmEvents } from './wallets'
 import { ethBalance, solBalance, quote, sendEthToSol, sendSolToEth, status, tornMint, evm, type Quote } from './bridge'
 
 type Dir = 'eth2sol' | 'sol2eth'
@@ -63,6 +63,7 @@ app.innerHTML = `
         <ul class="steps hidden" id="steps"></ul>
 
         <button class="button is-primary" id="action">Connect</button>
+        <div class="wallet-hint" id="wallet-hint"></div>
       </div>
     </section>
 
@@ -286,11 +287,11 @@ $('#use-mine').addEventListener('click', async (e) => {
     scheduleQuote()
   } catch (err: any) { showError(err?.message ?? String(err)) }
 })
-window.ethereum?.on?.('accountsChanged', (a: string[]) => { evmAccount = (a[0] as Address) ?? null; refresh() })
-window.ethereum?.on?.('chainChanged', () => location.reload())
+onEvmEvents((a) => { evmAccount = (a[0] as Address) ?? null; refresh() }, () => location.reload())
 
 ;(async () => {
   renderHistory()
+  $('#wallet-hint').textContent = `Wallet: ${detectedWallets()}`
   const mint = await tornMint()
   $('#mint').innerHTML = mint ? `<a href="${EXPLORER.solToken(mint)}" target="_blank" rel="noopener">${mint.slice(0, 6)}…${mint.slice(-4)}</a>` : 'not deployed yet'
   $('#not-deployed').classList.toggle('hidden', !!mint)

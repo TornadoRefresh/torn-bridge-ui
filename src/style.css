@@ -130,3 +130,5 @@ code { color: var(--primary); }
   .brand span { font-size: 1.3rem; }
   .nav { gap: .75rem; font-size: .9rem; }
 }
+
+.wallet-hint { margin-top: .6rem; text-align: center; font-size: .78rem; color: var(--gray); }
