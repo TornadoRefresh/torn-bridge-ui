@@ -1,0 +1,43 @@
+name: Build and pin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+      # Reproducible IPFS CID of dist/ (CIDv1, same as `ipfs add -r --cid-version 1`)
+      - name: Compute IPFS CID
+        id: cid
+        run: |
+          curl -sL https://dist.ipfs.tech/kubo/v0.35.0/kubo_v0.35.0_linux-amd64.tar.gz | tar xz
+          CID=$(./kubo/ipfs add -r -Q --cid-version 1 --only-hash dist)
+          echo "cid=$CID" >> "$GITHUB_OUTPUT"
+          echo "### IPFS CID" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"; echo "$CID" >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "Preview: https://$CID.ipfs.dweb.link/" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ steps.cid.outputs.cid }}
+          path: dist
+
+      # Optional: publish through Fleek when a FLEEK_TOKEN secret is configured.
+      - name: Deploy to Fleek
+        if: github.event_name == 'push' && env.FLEEK_TOKEN != ''
+        env:
+          FLEEK_TOKEN: ${{ secrets.FLEEK_TOKEN }}
+          FLEEK_PROJECT_ID: ${{ secrets.FLEEK_PROJECT_ID }}
+        run: npx @fleek-platform/cli sites deploy

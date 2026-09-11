@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Blocks commits that contain machine paths, personal emails or a non-project identity.
+# Extra private patterns (never committed) are read from ~/.config/torn-leakcheck/patterns.
+set -u
+GENERIC="/Users/|/home/[a-z]|C:\\\\Users|@icloud\.com|@gmail\.com|@outlook\.com|@qq\.com"
+EXTRA=""
+if [ -f "$HOME/.config/torn-leakcheck/patterns" ]; then
+  EXTRA=$(grep -v "^\s*$" "$HOME/.config/torn-leakcheck/patterns" | paste -sd "|" -)
+fi
+PATTERN="$GENERIC"; [ -n "$EXTRA" ] && PATTERN="$GENERIC|$EXTRA"
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -vE "^\.githooks/|package-lock\.json$|yarn\.lock$")
+if [ -n "$files" ] && echo "$files" | xargs grep -nIiE "$PATTERN" 2>/dev/null; then
+  echo "pre-commit: personal information or local path detected, commit blocked." >&2; exit 1
+fi
+if [ "$(git config user.email)" != "327767242+TornadoRefresh@users.noreply.github.com" ]; then
+  echo "pre-commit: commit identity must be TornadoRefresh, commit blocked." >&2; exit 1
+fi
+exit 0
