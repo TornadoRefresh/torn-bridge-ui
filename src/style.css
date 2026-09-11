@@ -131,10 +131,21 @@ code { color: var(--primary); }
   .nav { gap: .75rem; font-size: .9rem; }
 }
 
-.wallet-hint { margin-top: .6rem; text-align: center; font-size: .78rem; color: var(--gray); }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,4,3,.85); display: grid; place-items: center; z-index: 50; padding: 1rem; }
 .modal-box { width: 100%; max-width: 360px; }
 .wallet-list { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1rem; }
 .wallet-item { justify-content: flex-start; width: 100%; height: 3.2em; }
 .wallet-item img { width: 24px; height: 24px; border-radius: 6px; }
+
+.wallet-bar { display: flex; align-items: center; gap: .6rem; margin-left: auto; flex-wrap: wrap; }
+.nav { margin-right: 0; }
+.wallet-chip { display: inline-flex; }
+.chip-connect { height: 2.4em; }
+.chip-connected { display: inline-flex; align-items: center; gap: .5rem; height: 2.4em; padding: 0 .4rem 0 .6rem; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); font-size: .85rem; }
+.chip-connected img { width: 18px; height: 18px; border-radius: 4px; }
+.chip-connected .chain-icon { width: 18px; height: 18px; font-size: 9px; }
+.chip-addr { color: var(--primary); }
+.chip-x { background: none; border: 0; color: var(--gray); font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 0 .3rem; }
+.chip-x:hover { color: var(--danger); }
+@media (max-width: 520px) { .wallet-bar { margin-left: 0; width: 100%; } }

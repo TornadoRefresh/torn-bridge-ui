@@ -4,7 +4,7 @@ import { Connection, PublicKey, Transaction } from '@solana/web3.js'
 import { createStore, type EIP6963ProviderDetail } from 'mipd'
 import { getWallets } from '@wallet-standard/app'
 import type { Wallet, WalletAccount } from '@wallet-standard/base'
-import { StandardConnect, type StandardConnectFeature } from '@wallet-standard/features'
+import { StandardConnect, StandardDisconnect, type StandardConnectFeature, type StandardDisconnectFeature } from '@wallet-standard/features'
 import { SolanaSignAndSendTransaction, type SolanaSignAndSendTransactionFeature } from '@solana/wallet-standard-features'
 import bs58 from 'bs58'
 import { ETH_CHAIN_ID, ETH_RPC, NETWORK, SOL_RPCS } from './config'
@@ -77,6 +77,7 @@ function pickWallet<T extends WalletOption>(title: string, options: T[]): Promis
 // ---------- EVM ----------
 let evmSelected: EIP6963ProviderDetail | null = null
 export let evmWalletName = ''
+export let evmWalletIcon = ''
 
 export async function connectEvm(): Promise<Address> {
   const options = evmOptions()
@@ -92,8 +93,15 @@ export async function connectEvm(): Promise<Address> {
       throw new Error(`Please switch ${sel.name} to ${evmChain.name}.`)
     }
   }
-  evmSelected = sel.detail; evmWalletName = sel.name
+  evmSelected = sel.detail; evmWalletName = sel.name; evmWalletIcon = sel.icon
   return account
+}
+
+/** Forget the EVM wallet; also asks the wallet to revoke permissions when it supports EIP-2255 revocation. */
+export async function disconnectEvm() {
+  const p = evmSelected?.provider as any
+  evmSelected = null; evmWalletName = ''; evmWalletIcon = ''
+  try { await p?.request?.({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }) } catch { /* optional */ }
 }
 
 export function walletClient(account: Address) {
@@ -110,6 +118,7 @@ export function onEvmEvents(onAccounts: (a: string[]) => void, onChain: () => vo
 // ---------- Solana ----------
 let solSelected: { wallet: SolWallet; account: WalletAccount } | null = null
 export let solWalletName = ''
+export let solWalletIcon = ''
 
 export async function connectSol(): Promise<PublicKey> {
   const options = solOptions()
@@ -118,8 +127,14 @@ export async function connectSol(): Promise<PublicKey> {
   const { accounts } = await sel.wallet.features[StandardConnect].connect()
   const account = accounts.find((a) => a.chains.includes(SOL_CHAIN)) ?? accounts[0]
   if (!account) throw new Error('No Solana account authorized')
-  solSelected = { wallet: sel.wallet, account }; solWalletName = sel.name
+  solSelected = { wallet: sel.wallet, account }; solWalletName = sel.name; solWalletIcon = sel.icon
   return new PublicKey(account.address)
+}
+
+export async function disconnectSol() {
+  const w = solSelected?.wallet as (Wallet & { features: Partial<StandardDisconnectFeature> }) | undefined
+  solSelected = null; solWalletName = ''; solWalletIcon = ''
+  try { await w?.features[StandardDisconnect]?.disconnect() } catch { /* optional feature */ }
 }
 
 export async function signAndSendSol(tx: Transaction): Promise<string> {

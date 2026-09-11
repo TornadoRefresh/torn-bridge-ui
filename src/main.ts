@@ -2,7 +2,7 @@ import './style.css'
 import { formatUnits, parseUnits, isAddress, type Address } from 'viem'
 import { PublicKey } from '@solana/web3.js'
 import { NETWORK, TORN_ETH, ETH_DECIMALS, SOL_DECIMALS, EXPLORER, KNOWN } from './config'
-import { connectEvm, connectSol, evmWalletName, onEvmEvents, solWalletName } from './wallets'
+import { connectEvm, connectSol, disconnectEvm, disconnectSol, evmWalletIcon, evmWalletName, onEvmEvents, solWalletIcon, solWalletName } from './wallets'
 import { ethBalance, solBalance, quote, sendEthToSol, sendSolToEth, status, tornMint, evm, type Quote } from './bridge'
 
 type Dir = 'eth2sol' | 'sol2eth'
@@ -25,7 +25,11 @@ app.innerHTML = `
   <header class="header"><div class="container">
     <a class="brand" href="https://tornadocash.eth.limo" target="_blank" rel="noopener"><img src="/logo.svg" alt="" /><span>tornado</span></a>
     <nav class="nav"><a href="https://tornadocash.eth.limo" target="_blank" rel="noopener">App</a><a href="https://etherscan.io/token/${TORN_ETH}" target="_blank" rel="noopener">TORN</a><a href="https://github.com/Near-One/omni-bridge" target="_blank" rel="noopener">Omni Bridge</a></nav>
-    <span class="network-tag ${NETWORK}"><span class="dot"></span>${NETWORK === 'mainnet' ? 'Ethereum ↔ Solana' : 'Sepolia ↔ Devnet'}</span>
+    <div class="wallet-bar">
+      <span class="network-tag ${NETWORK}"><span class="dot"></span>${NETWORK === 'mainnet' ? 'mainnet' : 'testnet'}</span>
+      <div class="wallet-chip" id="chip-eth"></div>
+      <div class="wallet-chip" id="chip-sol"></div>
+    </div>
   </div></header>
 
   <main class="main"><div class="container"><div class="grid">
@@ -62,8 +66,7 @@ app.innerHTML = `
         <div id="error" class="notice is-danger hidden"></div>
         <ul class="steps hidden" id="steps"></ul>
 
-        <button class="button is-primary" id="action">Connect</button>
-        <div class="wallet-hint" id="wallet-hint"></div>
+        <button class="button is-primary" id="action">Bridge</button>
       </div>
     </section>
 
@@ -142,8 +145,7 @@ async function refresh() {
     balance = !connected ? 0n : dir === 'eth2sol' ? await ethBalance(evmAccount!) : await solBalance(solAccount!)
   } catch { balance = 0n }
   $('#balance').textContent = connected ? `Balance: ${fmt(balance)} TORN` : '—'
-  const names = [evmAccount && `Ethereum: ${evmWalletName} ${evmAccount.slice(0, 6)}…${evmAccount.slice(-4)}`, solAccount && `Solana: ${solWalletName} ${solAccount.toBase58().slice(0, 4)}…${solAccount.toBase58().slice(-4)}`].filter(Boolean)
-  $('#wallet-hint').textContent = names.join('  ·  ')
+  renderWalletBar()
   updateAction()
   scheduleQuote()
 }
@@ -152,7 +154,7 @@ function updateAction() {
   const connected = dir === 'eth2sol' ? !!evmAccount : !!solAccount
   const amt = parseAmount()
   if (busy) { actionBtn.disabled = true; return }
-  if (!connected) { actionBtn.textContent = dir === 'eth2sol' ? 'Connect Ethereum wallet' : 'Connect Solana wallet'; actionBtn.disabled = false; return }
+  if (!connected) { actionBtn.textContent = dir === 'eth2sol' ? 'Connect Ethereum wallet (top right)' : 'Connect Solana wallet (top right)'; actionBtn.disabled = true; return }
   if (!amt) { actionBtn.textContent = 'Enter amount'; actionBtn.disabled = true; return }
   if (amt > balance) { actionBtn.textContent = 'Insufficient balance'; actionBtn.disabled = true; return }
   if (!recipientValid()) { actionBtn.textContent = 'Enter recipient'; actionBtn.disabled = true; return }
@@ -209,6 +211,37 @@ function setSteps(list: string[], activeIdx: number) {
   stepsEl.innerHTML = list.map((s, i) => `<li class="${i < activeIdx ? 'done' : i === activeIdx ? 'active' : ''}">${s}</li>`).join('')
 }
 
+function chip(el: HTMLElement, label: string, icon: string, name: string, addr: string | null, onConnect: () => void, onDisconnect: () => void) {
+  if (!addr) {
+    el.innerHTML = `<button class="button is-small chip-connect">Connect ${label}</button>`
+    el.querySelector('button')!.addEventListener('click', onConnect)
+    return
+  }
+  el.innerHTML = `<span class="chip-connected" title="${name} · ${addr}">${icon ? `<img src="${icon}" alt="" />` : `<span class="chain-icon">${label === 'ETH' ? 'Ξ' : '◎'}</span>`}<span class="chip-addr">${addr.slice(0, 6)}…${addr.slice(-4)}</span><button class="chip-x" title="Disconnect ${label}">×</button></span>`
+  el.querySelector('.chip-x')!.addEventListener('click', onDisconnect)
+}
+
+function renderWalletBar() {
+  chip($('#chip-eth'), 'ETH', evmWalletIcon, evmWalletName, evmAccount, doConnectEvm, doDisconnectEvm)
+  chip($('#chip-sol'), 'SOL', solWalletIcon, solWalletName, solAccount?.toBase58() ?? null, doConnectSol, doDisconnectSol)
+}
+
+async function doConnectEvm() {
+  showError(null)
+  try {
+    evmAccount = await connectEvm()
+    onEvmEvents((a) => { evmAccount = (a[0] as Address) ?? null; refresh() }, () => location.reload())
+  } catch (e: any) { showError(e?.message ?? String(e)) }
+  await refresh()
+}
+async function doDisconnectEvm() { await disconnectEvm(); evmAccount = null; await refresh() }
+async function doConnectSol() {
+  showError(null)
+  try { solAccount = await connectSol() } catch (e: any) { showError(e?.message ?? String(e)) }
+  await refresh()
+}
+async function doDisconnectSol() { await disconnectSol(); solAccount = null; await refresh() }
+
 function loadHistory(): HistoryItem[] { try { return JSON.parse(localStorage.getItem(HKEY) || '[]') } catch { return [] } }
 function saveHistory(h: HistoryItem[]) { try { localStorage.setItem(HKEY, JSON.stringify(h.slice(0, 20))) } catch {} }
 
@@ -238,8 +271,6 @@ async function pollHistory() {
 async function onAction() {
   showError(null)
   try {
-    if (dir === 'eth2sol' && !evmAccount) { evmAccount = await connectEvm(); onEvmEvents((a) => { evmAccount = (a[0] as Address) ?? null; refresh() }, () => location.reload()); await refresh(); return }
-    if (dir === 'sol2eth' && !solAccount) { solAccount = await connectSol(); await refresh(); return }
     const amt = parseAmount()!
     const to = recipientEl.value.trim()
     const q = currentQuote!
@@ -284,8 +315,8 @@ actionBtn.addEventListener('click', onAction)
 $('#use-mine').addEventListener('click', async (e) => {
   e.preventDefault()
   try {
-    if (dir === 'eth2sol') { solAccount = solAccount ?? (await connectSol()); recipientEl.value = solAccount.toBase58() }
-    else { evmAccount = evmAccount ?? (await connectEvm()); recipientEl.value = evmAccount }
+    if (dir === 'eth2sol') { if (!solAccount) await doConnectSol(); if (solAccount) recipientEl.value = solAccount.toBase58() }
+    else { if (!evmAccount) await doConnectEvm(); if (evmAccount) recipientEl.value = evmAccount }
     scheduleQuote()
   } catch (err: any) { showError(err?.message ?? String(err)) }
 })
