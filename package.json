@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vite": "^8.3.0",
     "vite-plugin-node-polyfills": "^0.28.0"
   },
